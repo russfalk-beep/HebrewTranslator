@@ -1,7 +1,7 @@
 import { createWorker } from 'tesseract.js';
 import { HebrewLine, HebrewWord } from './types';
 import { transliterateHebrew, isHebrew } from './transliterate';
-import { translateWord } from './dictionary';
+import { translateWord, loadDictionary } from './dictionary';
 
 export interface OcrResult {
   lines: HebrewLine[];
@@ -22,6 +22,9 @@ export async function processImage(
   });
 
   try {
+    // Load full dictionary while OCR runs
+    await loadDictionary();
+
     // Enable blocks output to get word-level bounding boxes
     const { data } = await worker.recognize(imageSource, {}, { blocks: true, text: true });
 

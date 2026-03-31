@@ -1,354 +1,95 @@
-// Common Hebrew words with English translations
-// Covers basic vocabulary found in children's Hebrew textbooks
-const DICTIONARY: Record<string, string> = {
-  // Greetings & Common
-  'שלום': 'hello/peace',
-  'תודה': 'thank you',
-  'בבקשה': 'please',
-  'כן': 'yes',
-  'לא': 'no',
-  'טוב': 'good',
-  'רע': 'bad',
-  'יפה': 'beautiful',
-  'גדול': 'big',
-  'קטן': 'small',
-  'חדש': 'new',
-  'ישן': 'old/sleep',
+// Full dictionary loaded from JSON file (25,000+ entries)
+let fullDict: Record<string, string> | null = null;
+let dictLoading = false;
+let dictLoaded = false;
 
-  // Pronouns
-  'אני': 'I',
-  'אתה': 'you (m)',
-  'את': 'you (f)/(object)',
-  'הוא': 'he/it',
-  'היא': 'she',
-  'אנחנו': 'we',
-  'אתם': 'you (pl)',
-  'הם': 'they (m)',
-  'הן': 'they (f)',
-  'זה': 'this (m)',
-  'זאת': 'this (f)',
-  'מה': 'what',
-  'מי': 'who',
-  'איפה': 'where',
-  'למה': 'why',
-  'איך': 'how',
-  'מתי': 'when',
-  'כמה': 'how much',
+// Load the full dictionary from the public folder
+export async function loadDictionary(): Promise<void> {
+  if (dictLoaded || dictLoading) return;
+  dictLoading = true;
 
-  // Family
-  'אבא': 'father',
-  'אמא': 'mother',
-  'אח': 'brother',
-  'אחות': 'sister',
-  'סבא': 'grandfather',
-  'סבתא': 'grandmother',
-  'בן': 'son',
-  'בת': 'daughter',
-  'ילד': 'boy/child',
-  'ילדה': 'girl',
-  'ילדים': 'children',
-  'משפחה': 'family',
-  'תינוק': 'baby',
+  try {
+    // Detect basePath for GitHub Pages vs local dev
+    const basePath = window.location.pathname.includes('/HebrewTranslator')
+      ? '/HebrewTranslator'
+      : '';
+    const res = await fetch(`${basePath}/dict-he-en.json`);
+    if (res.ok) {
+      fullDict = await res.json();
+      dictLoaded = true;
+    }
+  } catch {
+    // Dictionary load failed — will use built-in fallback
+  }
+  dictLoading = false;
+}
 
-  // Body
-  'ראש': 'head',
-  'עין': 'eye',
-  'עיניים': 'eyes',
-  'אוזן': 'ear',
-  'אף': 'nose',
-  'פה': 'mouth/here',
-  'יד': 'hand',
-  'רגל': 'foot/leg',
-  'לב': 'heart',
-  'גוף': 'body',
-  'שיער': 'hair',
-  'פנים': 'face',
-
-  // Nature
-  'שמש': 'sun',
-  'ירח': 'moon',
-  'כוכב': 'star',
-  'שמים': 'sky',
-  'ארץ': 'land/earth',
-  'מים': 'water',
-  'אש': 'fire',
-  'עץ': 'tree',
-  'פרח': 'flower',
-  'ים': 'sea',
-  'הר': 'mountain',
-  'נהר': 'river',
-  'גשם': 'rain',
-  'רוח': 'wind',
-  'אבן': 'stone',
-
-  // Animals
-  'כלב': 'dog',
-  'חתול': 'cat',
-  'ציפור': 'bird',
-  'דג': 'fish',
-  'סוס': 'horse',
-  'פרה': 'cow',
-  'חמור': 'donkey',
-  'אריה': 'lion',
-  'נחש': 'snake',
-  'דוב': 'bear',
-  'תרנגולת': 'chicken',
-
-  // Food
-  'לחם': 'bread',
-  'חלב': 'milk',
-  'ביצה': 'egg',
-  'תפוח': 'apple',
-  'בננה': 'banana',
-  'אוכל': 'food',
-  'שתייה': 'drink',
-  'סוכר': 'sugar',
-  'מלח': 'salt',
-  'בשר': 'meat',
-  'פרי': 'fruit',
-  'ירק': 'vegetable',
-
-  // Numbers
-  'אחד': 'one',
-  'שניים': 'two',
-  'שלושה': 'three',
-  'ארבעה': 'four',
-  'חמישה': 'five',
-  'שישה': 'six',
-  'שבעה': 'seven',
-  'שמונה': 'eight',
-  'תשעה': 'nine',
-  'עשרה': 'ten',
-  'אחת': 'one (f)',
-  'שתיים': 'two (f)',
-  'שלוש': 'three (f)',
-  'ארבע': 'four (f)',
-  'חמש': 'five (f)',
-  'שש': 'six (f)',
-  'שבע': 'seven (f)',
-  'תשע': 'nine (f)',
-  'עשר': 'ten (f)',
-  'מאה': 'hundred',
-  'אלף': 'thousand',
-
-  // Colors
-  'אדום': 'red',
-  'כחול': 'blue',
-  'ירוק': 'green',
-  'צהוב': 'yellow',
-  'לבן': 'white',
-  'שחור': 'black',
-  'כתום': 'orange',
-  'סגול': 'purple',
-  'חום': 'brown',
-  'ורוד': 'pink',
-
-  // Time
-  'יום': 'day',
-  'לילה': 'night',
-  'בוקר': 'morning',
-  'ערב': 'evening',
-  'שבוע': 'week',
-  'חודש': 'month',
-  'שנה': 'year',
-  'היום': 'today',
-  'מחר': 'tomorrow',
-  'אתמול': 'yesterday',
-  'עכשיו': 'now',
-  'תמיד': 'always',
-  'שעה': 'hour',
-  'דקה': 'minute',
-  'זמן': 'time',
-
-  // Days
-  'ראשון': 'Sunday/first',
-  'שני': 'Monday/second',
-  'שלישי': 'Tuesday/third',
-  'רביעי': 'Wednesday/fourth',
-  'חמישי': 'Thursday/fifth',
-  'שישי': 'Friday/sixth',
-  'שבת': 'Shabbat/Saturday',
-
-  // Common Verbs (present tense forms)
-  'אוהב': 'love (m)',
-  'אוהבת': 'love (f)',
-  'רוצה': 'want',
-  'יודע': 'know (m)',
-  'יודעת': 'know (f)',
-  'הולך': 'go (m)',
-  'הולכת': 'go (f)',
-  'בא': 'come (m)',
-  'באה': 'come (f)',
-  'אומר': 'say (m)',
-  'אומרת': 'say (f)',
-  'רואה': 'see',
-  'שומע': 'hear (m)',
-  'שומעת': 'hear (f)',
-  'עושה': 'do/make',
-  'נותן': 'give (m)',
-  'נותנת': 'give (f)',
-  'לוקח': 'take (m)',
-  'לוקחת': 'take (f)',
-  'אוכלת': 'eat (f)',
-  'שותה': 'drink',
-  'ישנה': 'sleep (f)',
-  'קורא': 'read (m)',
-  'קוראת': 'read (f)',
-  'כותב': 'write (m)',
-  'כותבת': 'write (f)',
-  'לומד': 'learn (m)',
-  'לומדת': 'learn (f)',
-  'משחק': 'play (m)',
-  'משחקת': 'play (f)',
-  'שר': 'sing (m)',
-  'שרה': 'sing (f)',
-  'רוקד': 'dance (m)',
-  'רוקדת': 'dance (f)',
-  'רץ': 'run (m)',
-  'רצה': 'run (f)',
-  'יושב': 'sit (m)',
-  'יושבת': 'sit (f)',
-  'עומד': 'stand (m)',
-  'עומדת': 'stand (f)',
-  'חושב': 'think (m)',
-  'חושבת': 'think (f)',
-
-  // Prepositions & Connectors
-  'של': 'of',
-  'על': 'on/about',
-  'עם': 'with',
-  'אל': 'to',
-  'מן': 'from',
-  'בין': 'between',
-  'לפני': 'before',
-  'אחרי': 'after',
-  'תחת': 'under',
-  'ליד': 'next to',
-  'בתוך': 'inside',
-  'מחוץ': 'outside',
-  'כי': 'because',
-  'אם': 'if/mother',
-  'גם': 'also',
-  'רק': 'only',
-  'כל': 'all/every',
-  'הרבה': 'many/much',
-  'מעט': 'few/little',
-  'עוד': 'more/still',
-  // 'פה' already defined above as mouth/here
-  'שם': 'there',
-  'אבל': 'but',
-  'או': 'or',
-  'ו': 'and',
-
-  // Places
-  'בית': 'house',
-  'ספר': 'book',
-  'עיר': 'city',
-  'כפר': 'village',
-  'רחוב': 'street',
-  'גן': 'garden',
-  'חדר': 'room',
-  'דלת': 'door',
-  'חלון': 'window',
-  'שולחן': 'table',
-  'כיסא': 'chair',
-  'מיטה': 'bed',
-  'ארון': 'closet',
-
-  // School
-  'מורה': 'teacher',
-  'תלמיד': 'student (m)',
-  'תלמידה': 'student (f)',
-  'כיתה': 'classroom',
-  'עט': 'pen',
-  'עיפרון': 'pencil',
-  'מחברת': 'notebook',
-  'לוח': 'board',
-  'שיעור': 'lesson',
-  'בית ספר': 'school',
-
-  // Common adjectives
-  'חזק': 'strong',
-  'חלש': 'weak',
-  'מהיר': 'fast',
-  'איטי': 'slow',
-  'חכם': 'smart',
-  'שמח': 'happy',
-  'עצוב': 'sad',
-  'קשה': 'hard/difficult',
-  'קל': 'easy',
-  'חם': 'hot',
-  'קר': 'cold',
-  'ישר': 'straight',
-  'עגול': 'round',
-  'ארוך': 'long',
-  'קצר': 'short',
-  'רחב': 'wide',
-  'צר': 'narrow',
-  'עמוק': 'deep',
-  'גבוה': 'tall/high',
-  'נמוך': 'low/short',
-
-  // Religious/Holiday (common in Hebrew school)
-  'אלוהים': 'God',
-  'תורה': 'Torah',
-  'מצווה': 'commandment',
-  'ברכה': 'blessing',
-  'תפילה': 'prayer',
-  'בראשית': 'Genesis/beginning',
-  'שמות': 'Exodus/names',
-  'חג': 'holiday',
-  'נר': 'candle',
-  'כיפה': 'kippah',
-  'סידור': 'prayer book',
-  'ישראל': 'Israel',
-  'ירושלים': 'Jerusalem',
-  'עברית': 'Hebrew',
-  'אמן': 'amen',
-  'ברוך': 'blessed',
-  'קדוש': 'holy',
-  'מלך': 'king',
-  'מלכה': 'queen',
-  'עולם': 'world',
-  'נשמה': 'soul',
-  'חיים': 'life',
-  'אור': 'light',
-  'חושך': 'darkness',
-  'שמחה': 'joy',
-  'צדק': 'justice',
-  'אמת': 'truth',
-  'חסד': 'kindness',
-  'רחמים': 'mercy',
-
-  // Articles & common particles
-  'ה': 'the',
-  'ל': 'to/for',
-  'ש': 'that/which',
-  'יש': 'there is',
-  'אין': 'there isn\'t',
+// Common words built-in for instant access (no network needed)
+const BUILTIN: Record<string, string> = {
+  'שלום': 'hello/peace', 'תודה': 'thank you', 'בבקשה': 'please',
+  'כן': 'yes', 'לא': 'no', 'טוב': 'good', 'יפה': 'beautiful',
+  'גדול': 'big', 'קטן': 'small', 'חדש': 'new',
+  'אני': 'I', 'אתה': 'you (m)', 'את': 'you (f)',
+  'הוא': 'he', 'היא': 'she', 'אנחנו': 'we', 'הם': 'they',
+  'זה': 'this', 'מה': 'what', 'מי': 'who', 'איפה': 'where',
+  'למה': 'why', 'איך': 'how', 'מתי': 'when',
+  'אבא': 'father', 'אמא': 'mother', 'אח': 'brother', 'אחות': 'sister',
+  'בן': 'son', 'בת': 'daughter', 'ילד': 'child', 'ילדה': 'girl',
+  'משפחה': 'family', 'בית': 'house', 'ספר': 'book', 'מים': 'water',
+  'לחם': 'bread', 'שמש': 'sun', 'ירח': 'moon', 'ארץ': 'earth',
+  'יום': 'day', 'לילה': 'night', 'שנה': 'year',
+  'אחד': 'one', 'שניים': 'two', 'שלושה': 'three',
+  'אדום': 'red', 'כחול': 'blue', 'ירוק': 'green',
+  'של': 'of', 'על': 'on', 'עם': 'with', 'אל': 'to', 'כי': 'because',
+  'גם': 'also', 'רק': 'only', 'כל': 'all', 'עוד': 'more',
+  'אבל': 'but', 'או': 'or',
+  'אוהב': 'love', 'רוצה': 'want', 'יודע': 'know',
+  'הולך': 'go', 'בא': 'come', 'רואה': 'see',
+  'שומע': 'hear', 'עושה': 'do/make', 'קורא': 'read',
+  'כותב': 'write', 'לומד': 'learn',
+  'ה': 'the', 'ב': 'in', 'ל': 'to/for', 'מ': 'from',
+  'ו': 'and', 'ש': 'that', 'יש': 'there is', 'אין': 'there isn\'t',
+  'אלוהים': 'God', 'תורה': 'Torah', 'ברכה': 'blessing',
+  'ברוך': 'blessed', 'קדוש': 'holy', 'מלך': 'king', 'עולם': 'world',
+  'אור': 'light', 'חיים': 'life', 'שמחה': 'joy', 'אמת': 'truth',
+  'שבת': 'Shabbat', 'ישראל': 'Israel', 'ירושלים': 'Jerusalem',
 };
 
-// Strip niqqud (vowel marks) from Hebrew text for dictionary lookup
+// Strip niqqud (vowel marks) for lookup
 function stripNiqqud(text: string): string {
   return text.replace(/[\u0591-\u05C7]/g, '');
 }
 
-// Try to find translation, including with common prefix removal
+// Look up a Hebrew word — tries full dictionary first, then built-in
 export function translateWord(hebrew: string): string | null {
   const clean = stripNiqqud(hebrew.trim());
+  if (!clean) return null;
 
-  // Direct lookup
-  if (DICTIONARY[clean]) return DICTIONARY[clean];
+  // Try full dictionary
+  if (fullDict) {
+    if (fullDict[clean]) return fullDict[clean];
 
-  // Try removing common prefixes: ה (the), ב (in), ל (to), מ (from), ו (and), כ (like), ש (that)
-  const prefixes = ['ה', 'ב', 'ל', 'מ', 'ו', 'כ', 'ש', 'וה', 'בה', 'לה', 'מה', 'שה', 'וב', 'ול', 'ומ'];
+    // Try removing common prefixes
+    const prefixes = ['ה', 'ב', 'ל', 'מ', 'ו', 'כ', 'ש', 'וה', 'בה', 'לה', 'מה', 'שה', 'וב', 'ול', 'ומ'];
+    for (const prefix of prefixes) {
+      if (clean.startsWith(prefix) && clean.length > prefix.length + 1) {
+        const root = clean.slice(prefix.length);
+        if (fullDict[root]) {
+          return fullDict[root];
+        }
+      }
+    }
+  }
+
+  // Fallback to built-in dictionary
+  if (BUILTIN[clean]) return BUILTIN[clean];
+
+  // Try prefix removal on built-in
+  const prefixes = ['ה', 'ב', 'ל', 'מ', 'ו', 'כ', 'ש'];
   for (const prefix of prefixes) {
     if (clean.startsWith(prefix) && clean.length > prefix.length + 1) {
       const root = clean.slice(prefix.length);
-      if (DICTIONARY[root]) {
-        const prefixMeaning = prefix.includes('ו') ? 'and ' : '';
-        return prefixMeaning + DICTIONARY[root];
-      }
+      if (BUILTIN[root]) return BUILTIN[root];
     }
   }
 
