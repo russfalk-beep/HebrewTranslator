@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: ["claude/hebrew-tutor-app-TVUhz"]
+    branches: ["main", "claude/hebrew-tutor-app-TVUhz"]
 
 permissions:
   contents: read
