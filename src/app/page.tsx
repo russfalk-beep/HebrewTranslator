@@ -6,7 +6,8 @@ import { getSavedPages, deletePage, savePage, getPage, updateProgress } from '@/
 import { processImage } from '@/lib/ocr';
 import ImageCapture from '@/components/ImageCapture';
 import ProcessingOverlay from '@/components/ProcessingOverlay';
-import PageViewer from '@/components/PageViewer';
+import ImageOverlay from '@/components/ImageOverlay';
+import ImageCropper from '@/components/ImageCropper';
 
 export default function Home() {
   const [pages, setPages] = useState<SavedPage[]>([]);
@@ -15,13 +16,12 @@ export default function Home() {
   const [showCapture, setShowCapture] = useState(false);
   const [activePageId, setActivePageId] = useState<string | null>(null);
   const [activePage, setActivePage] = useState<SavedPage | null>(null);
-  const [showImage, setShowImage] = useState(false);
+  const [rawImage, setRawImage] = useState<string | null>(null); // For cropping step
 
   useEffect(() => {
     setPages(getSavedPages());
   }, []);
 
-  // Open a page for reading
   const openPage = (id: string) => {
     const page = getPage(id);
     if (page) {
@@ -30,23 +30,28 @@ export default function Home() {
     }
   };
 
-  // Go back to dashboard
   const goBack = () => {
     setActivePageId(null);
     setActivePage(null);
-    setShowImage(false);
-    setPages(getSavedPages()); // Refresh to show updated progress
+    setPages(getSavedPages());
   };
 
+  // Step 1: Image captured -> show cropper
   const handleImageCaptured = async (_file: File, dataUrl: string) => {
+    setShowCapture(false);
+    setRawImage(dataUrl);
+  };
+
+  // Step 2: Crop complete -> process the cropped image
+  const handleCropComplete = async (croppedDataUrl: string) => {
+    setRawImage(null);
     setIsProcessing(true);
     setProgress(0);
-    setShowCapture(false);
 
     try {
-      const lines = await processImage(dataUrl, (p) => setProgress(p));
+      const result = await processImage(croppedDataUrl, (p) => setProgress(p));
 
-      if (lines.length === 0) {
+      if (result.lines.length === 0) {
         alert('No Hebrew text was detected in the image. Please try again with a clearer photo.');
         setIsProcessing(false);
         return;
@@ -55,8 +60,10 @@ export default function Home() {
       const newPage: SavedPage = {
         id: crypto.randomUUID(),
         name: `Page ${pages.length + 1} - ${new Date().toLocaleDateString()}`,
-        imageDataUrl: dataUrl,
-        lines,
+        imageDataUrl: croppedDataUrl,
+        imageWidth: result.imageWidth,
+        imageHeight: result.imageHeight,
+        lines: result.lines,
         currentLineIndex: 0,
         currentWordIndex: 0,
         createdAt: Date.now(),
@@ -88,10 +95,10 @@ export default function Home() {
     }
   };
 
-  // ---- READER VIEW ----
+  // ---- READER VIEW (Image Overlay) ----
   if (activePageId && activePage) {
     return (
-      <main className="flex-1 max-w-lg mx-auto w-full px-4 py-4">
+      <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-4">
         {/* Header */}
         <div className="flex items-center gap-3 mb-4">
           <button
@@ -104,28 +111,13 @@ export default function Home() {
             </svg>
           </button>
           <h1 className="text-lg font-semibold text-gray-900 flex-1 truncate">{activePage.name}</h1>
-          <button
-            onClick={() => setShowImage(!showImage)}
-            className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-          >
-            {showImage ? 'Hide Image' : 'Show Image'}
-          </button>
         </div>
 
-        {/* Original image */}
-        {showImage && (
-          <div className="mb-4 rounded-xl overflow-hidden border border-gray-200">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={activePage.imageDataUrl}
-              alt="Original page"
-              className="w-full"
-            />
-          </div>
-        )}
-
-        {/* Page content with read-along */}
-        <PageViewer
+        {/* Image with word overlays */}
+        <ImageOverlay
+          imageDataUrl={activePage.imageDataUrl}
+          imageWidth={activePage.imageWidth}
+          imageHeight={activePage.imageHeight}
           lines={activePage.lines}
           initialLineIndex={activePage.currentLineIndex}
           initialWordIndex={activePage.currentWordIndex}
@@ -141,18 +133,19 @@ export default function Home() {
   return (
     <main className="flex-1 max-w-lg mx-auto w-full px-4 py-6">
       {isProcessing && <ProcessingOverlay progress={progress} />}
+      {rawImage && (
+        <ImageCropper
+          imageDataUrl={rawImage}
+          onCropComplete={handleCropComplete}
+          onCancel={() => setRawImage(null)}
+        />
+      )}
 
-      {/* Header */}
       <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          Hebrew Tutor
-        </h1>
-        <p className="text-gray-500">
-          Snap a photo of Hebrew text to start learning
-        </p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Hebrew Tutor</h1>
+        <p className="text-gray-500">Snap a photo of Hebrew text to start learning</p>
       </div>
 
-      {/* New Page Button / Camera */}
       {showCapture ? (
         <div className="mb-8">
           <ImageCapture onImageCaptured={handleImageCaptured} />
@@ -176,7 +169,6 @@ export default function Home() {
         </button>
       )}
 
-      {/* Saved Pages */}
       {sortedPages.length > 0 && (
         <div>
           <h2 className="text-lg font-semibold text-gray-700 mb-3">Your Pages</h2>
@@ -198,7 +190,6 @@ export default function Home() {
                     className="w-full p-4 text-left"
                   >
                     <div className="flex items-center gap-3">
-                      {/* Thumbnail */}
                       <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
@@ -239,7 +230,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* Empty state */}
       {sortedPages.length === 0 && !showCapture && (
         <div className="text-center py-12 text-gray-400">
           <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mx-auto mb-4 opacity-50">
