@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { SavedPage } from '@/lib/types';
 import { getSavedPages, deletePage, savePage, getPage, updateProgress } from '@/lib/storage';
 import { processImage } from '@/lib/ocr';
+import { compressImage } from '@/lib/compress';
 import ImageCapture from '@/components/ImageCapture';
 import ProcessingOverlay from '@/components/ProcessingOverlay';
 import ImageOverlay from '@/components/ImageOverlay';
@@ -57,10 +58,13 @@ export default function Home() {
         return;
       }
 
+      // Compress image for storage (phone photos are huge)
+      const compressedImage = await compressImage(croppedDataUrl);
+
       const newPage: SavedPage = {
         id: crypto.randomUUID(),
         name: `Page ${pages.length + 1} - ${new Date().toLocaleDateString()}`,
-        imageDataUrl: croppedDataUrl,
+        imageDataUrl: compressedImage,
         imageWidth: result.imageWidth,
         imageHeight: result.imageHeight,
         lines: result.lines,

@@ -20,7 +20,24 @@ export function savePage(page: SavedPage): void {
   } else {
     pages.push(page);
   }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(pages));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(pages));
+  } catch (e) {
+    // Quota exceeded — try clearing old pages and retry
+    if (pages.length > 1) {
+      // Keep only the newest page
+      const newest = pages.sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 1);
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(newest));
+      } catch {
+        // Still too big — clear everything and save just this page
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify([page]));
+      }
+    } else {
+      throw e;
+    }
+  }
 }
 
 export function getPage(id: string): SavedPage | null {
