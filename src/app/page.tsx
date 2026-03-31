@@ -1,23 +1,42 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { SavedPage } from '@/lib/types';
-import { getSavedPages, deletePage, savePage } from '@/lib/storage';
+import { getSavedPages, deletePage, savePage, getPage, updateProgress } from '@/lib/storage';
 import { processImage } from '@/lib/ocr';
 import ImageCapture from '@/components/ImageCapture';
 import ProcessingOverlay from '@/components/ProcessingOverlay';
+import PageViewer from '@/components/PageViewer';
 
 export default function Home() {
-  const router = useRouter();
   const [pages, setPages] = useState<SavedPage[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [showCapture, setShowCapture] = useState(false);
+  const [activePageId, setActivePageId] = useState<string | null>(null);
+  const [activePage, setActivePage] = useState<SavedPage | null>(null);
+  const [showImage, setShowImage] = useState(false);
 
   useEffect(() => {
     setPages(getSavedPages());
   }, []);
+
+  // Open a page for reading
+  const openPage = (id: string) => {
+    const page = getPage(id);
+    if (page) {
+      setActivePage(page);
+      setActivePageId(id);
+    }
+  };
+
+  // Go back to dashboard
+  const goBack = () => {
+    setActivePageId(null);
+    setActivePage(null);
+    setShowImage(false);
+    setPages(getSavedPages()); // Refresh to show updated progress
+  };
 
   const handleImageCaptured = async (_file: File, dataUrl: string) => {
     setIsProcessing(true);
@@ -46,7 +65,9 @@ export default function Home() {
 
       savePage(newPage);
       setIsProcessing(false);
-      router.push(`/HebrewTranslator/reader?id=${newPage.id}`);
+      setActivePage(newPage);
+      setActivePageId(newPage.id);
+      setPages(getSavedPages());
     } catch (error) {
       console.error('OCR failed:', error);
       alert('Failed to process the image. Please try again.');
@@ -61,6 +82,60 @@ export default function Home() {
     }
   };
 
+  const handleProgressChange = (lineIndex: number, wordIndex: number) => {
+    if (activePage) {
+      updateProgress(activePage.id, lineIndex, wordIndex);
+    }
+  };
+
+  // ---- READER VIEW ----
+  if (activePageId && activePage) {
+    return (
+      <main className="flex-1 max-w-lg mx-auto w-full px-4 py-4">
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-4">
+          <button
+            onClick={goBack}
+            className="p-2 rounded-lg hover:bg-gray-200 transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M19 12H5"/>
+              <polyline points="12 19 5 12 12 5"/>
+            </svg>
+          </button>
+          <h1 className="text-lg font-semibold text-gray-900 flex-1 truncate">{activePage.name}</h1>
+          <button
+            onClick={() => setShowImage(!showImage)}
+            className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+          >
+            {showImage ? 'Hide Image' : 'Show Image'}
+          </button>
+        </div>
+
+        {/* Original image */}
+        {showImage && (
+          <div className="mb-4 rounded-xl overflow-hidden border border-gray-200">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={activePage.imageDataUrl}
+              alt="Original page"
+              className="w-full"
+            />
+          </div>
+        )}
+
+        {/* Page content with read-along */}
+        <PageViewer
+          lines={activePage.lines}
+          initialLineIndex={activePage.currentLineIndex}
+          initialWordIndex={activePage.currentWordIndex}
+          onProgressChange={handleProgressChange}
+        />
+      </main>
+    );
+  }
+
+  // ---- DASHBOARD VIEW ----
   const sortedPages = [...pages].sort((a, b) => b.updatedAt - a.updatedAt);
 
   return (
@@ -119,7 +194,7 @@ export default function Home() {
                   className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow"
                 >
                   <button
-                    onClick={() => router.push(`/HebrewTranslator/reader?id=${page.id}`)}
+                    onClick={() => openPage(page.id)}
                     className="w-full p-4 text-left"
                   >
                     <div className="flex items-center gap-3">
