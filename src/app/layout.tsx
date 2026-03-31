@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Hebrew Tutor",
-  description: "Snap a photo of Hebrew text and learn to read it with transliteration and audio",
+  title: "Hebrew Helper",
+  description: "Help your kids with Hebrew homework - snap a photo and read along together",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,

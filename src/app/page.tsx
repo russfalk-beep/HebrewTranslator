@@ -142,8 +142,8 @@ export default function Home() {
       )}
 
       <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Hebrew Tutor</h1>
-        <p className="text-gray-500">Snap a photo of Hebrew text to start learning</p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Hebrew Homework Helper</h1>
+        <p className="text-gray-500">Snap a photo and help your kids read along</p>
       </div>
 
       {showCapture ? (

@@ -1,25 +1,18 @@
-// Hebrew letter to phonetic English mapping
-// This covers the standard Hebrew alphabet plus common niqqud (vowel marks)
-const HEBREW_MAP: Record<string, string> = {
-  // Consonants
-  'א': "'",
+// Simple, readable Hebrew-to-English phonetic transliteration
+// Designed for parents helping kids learn — NOT academic notation
+
+const CONSONANTS: Record<string, string> = {
+  'א': '',      // silent
   'ב': 'v',
-  'בּ': 'b',
   'ג': 'g',
-  'גּ': 'g',
   'ד': 'd',
-  'דּ': 'd',
   'ה': 'h',
-  'הּ': 'h',
   'ו': 'v',
-  'וּ': 'u',
-  'וֹ': 'o',
   'ז': 'z',
-  'ח': 'ch',
+  'ח': 'kh',
   'ט': 't',
   'י': 'y',
   'כ': 'kh',
-  'כּ': 'k',
   'ך': 'kh',
   'ל': 'l',
   'מ': 'm',
@@ -27,103 +20,152 @@ const HEBREW_MAP: Record<string, string> = {
   'נ': 'n',
   'ן': 'n',
   'ס': 's',
-  'ע': "'",
+  'ע': '',      // silent
   'פ': 'f',
-  'פּ': 'p',
   'ף': 'f',
-  'צ': 'ts',
-  'ץ': 'ts',
+  'צ': 'tz',
+  'ץ': 'tz',
   'ק': 'k',
   'ר': 'r',
-  'שׁ': 'sh',
-  'שׂ': 's',
   'ש': 'sh',
   'ת': 't',
-  'תּ': 't',
 };
 
-// Niqqud (vowel marks)
-const VOWEL_MAP: Record<string, string> = {
-  '\u05B0': 'e',   // Shva
+// With dagesh (dot inside) - changes pronunciation
+const WITH_DAGESH: Record<string, string> = {
+  'ב': 'b',
+  'כ': 'k',
+  'פ': 'p',
+  'ת': 't',
+  'ג': 'g',
+  'ד': 'd',
+};
+
+const VOWELS: Record<string, string> = {
+  '\u05B0': 'e',   // Shva (short e or silent)
   '\u05B1': 'e',   // Hataf Segol
   '\u05B2': 'a',   // Hataf Patah
   '\u05B3': 'o',   // Hataf Qamats
   '\u05B4': 'i',   // Hiriq
-  '\u05B5': 'e',   // Tsere
+  '\u05B5': 'ei',  // Tsere
   '\u05B6': 'e',   // Segol
   '\u05B7': 'a',   // Patah
   '\u05B8': 'a',   // Qamats
   '\u05B9': 'o',   // Holam
   '\u05BA': 'o',   // Holam Haser
   '\u05BB': 'u',   // Qubuts
-  '\u05BC': '',    // Dagesh (modifies consonant, handled separately)
+  '\u05BC': '',    // Dagesh
 };
 
 export function transliterateHebrew(text: string): string {
-  // First try using the hebrew-transliteration library
-  try {
-    // Dynamic import would be ideal but for simplicity we'll use our own mapping
-    return customTransliterate(text);
-  } catch {
-    return customTransliterate(text);
-  }
-}
-
-function customTransliterate(text: string): string {
+  const chars = [...text];
   let result = '';
-  const chars = [...text]; // Handle multi-byte chars
+  let lastWasVowel = false;
 
   for (let i = 0; i < chars.length; i++) {
     const char = chars[i];
     const code = char.codePointAt(0) || 0;
 
-    // Check if it's a Hebrew consonant (0x05D0 - 0x05EA)
+    // Hebrew consonant
     if (code >= 0x05D0 && code <= 0x05EA) {
       // Check for dagesh in next char
-      if (i + 1 < chars.length && chars[i + 1] === '\u05BC') {
-        const withDagesh = char + '\u05BC';
-        if (HEBREW_MAP[withDagesh]) {
-          result += HEBREW_MAP[withDagesh];
-          i++; // Skip dagesh
+      const nextIsDagesh = i + 1 < chars.length && chars[i + 1] === '\u05BC';
+
+      // Shin/Sin dots
+      if (char === 'ש') {
+        if (i + 1 < chars.length && chars[i + 1] === '\u05C2') {
+          result += 's';  // Sin
+          i++;
+          lastWasVowel = false;
+          continue;
+        }
+        // Shin dot or default
+        if (i + 1 < chars.length && chars[i + 1] === '\u05C1') i++;
+        result += 'sh';
+        lastWasVowel = false;
+        continue;
+      }
+
+      // Vav with vowel marks = vowel, not consonant
+      if (char === 'ו') {
+        if (nextIsDagesh) {
+          result += 'u';  // Shuruk
+          i++;
+          lastWasVowel = true;
+          continue;
+        }
+        if (i + 1 < chars.length && chars[i + 1] === '\u05B9') {
+          result += 'o';  // Holam male
+          i++;
+          lastWasVowel = true;
           continue;
         }
       }
-      // Check combined forms with shin/sin dot
-      if (char === 'ש' && i + 1 < chars.length) {
-        if (chars[i + 1] === '\u05C1') { // Shin dot
-          result += 'sh';
-          i++;
-          continue;
-        } else if (chars[i + 1] === '\u05C2') { // Sin dot
-          result += 's';
-          i++;
-          continue;
-        }
+
+      if (nextIsDagesh && WITH_DAGESH[char]) {
+        result += WITH_DAGESH[char];
+        i++; // skip dagesh
+      } else {
+        result += CONSONANTS[char] || '';
       }
-      result += HEBREW_MAP[char] || char;
+      lastWasVowel = false;
     }
-    // Check if it's a vowel mark (niqqud)
+    // Vowel mark (niqqud)
     else if (code >= 0x05B0 && code <= 0x05BC) {
-      result += VOWEL_MAP[char] || '';
+      const vowel = VOWELS[char] || '';
+      if (vowel) {
+        // Avoid double vowels
+        if (!lastWasVowel || vowel !== result[result.length - 1]) {
+          result += vowel;
+        }
+        lastWasVowel = true;
+      }
     }
     // Skip other combining marks
     else if (code >= 0x05BD && code <= 0x05C7) {
       continue;
     }
-    // Pass through spaces, punctuation, etc.
-    else if (char === ' ' || char === '\n' || char === '\t') {
-      result += char;
+    // Dash/maqaf between words
+    else if (char === '\u05BE' || char === '-') {
+      result += '-';
+      lastWasVowel = false;
     }
-    // Pass through Latin chars and numbers
+    // Space
+    else if (char === ' ') {
+      result += ' ';
+      lastWasVowel = false;
+    }
+    // Pass through Latin chars, numbers, punctuation
     else if (code < 0x0590 || code > 0x05FF) {
       result += char;
+      lastWasVowel = false;
     }
   }
 
-  return result.trim();
+  // Clean up: remove leading/trailing dashes, collapse double consonants
+  let clean = result.trim()
+    .replace(/^-+|-+$/g, '')
+    .replace(/([^aeiou])\1+/g, '$1')  // remove doubled consonants like "ll" -> "l"
+    .replace(/'/g, '');                 // remove stray apostrophes
+
+  // If no vowels were found (unpointed text), insert default 'a' between consonants
+  if (clean.length > 0 && !/[aeiou]/i.test(clean)) {
+    let withVowels = '';
+    for (let i = 0; i < clean.length; i++) {
+      withVowels += clean[i];
+      // Add 'a' between consonants (not at end, not before space/dash)
+      if (i < clean.length - 1 &&
+          !/[aeiou \-]/.test(clean[i]) &&
+          !/[aeiou \-]/.test(clean[i + 1])) {
+        withVowels += 'a';
+      }
+    }
+    clean = withVowels;
+  }
+
+  return clean;
 }
 
-// Check if a string contains Hebrew characters
 export function isHebrew(text: string): boolean {
-  return /[\u0590-\u05FF]/.test(text);
+  return /[\u05D0-\u05EA]/.test(text);
 }

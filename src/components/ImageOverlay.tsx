@@ -30,17 +30,14 @@ export default function ImageOverlay({
   const [currentWord, setCurrentWord] = useState(initialWordIndex);
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeed] = useState(0.8);
+  const [showEnglish, setShowEnglish] = useState(false);
   const isPlayingRef = useRef(false);
 
-  useEffect(() => {
-    initVoices();
-  }, []);
+  useEffect(() => { initVoices(); }, []);
 
   useEffect(() => {
     const updateWidth = () => {
-      if (containerRef.current) {
-        setDisplayWidth(containerRef.current.offsetWidth);
-      }
+      if (containerRef.current) setDisplayWidth(containerRef.current.offsetWidth);
     };
     updateWidth();
     window.addEventListener('resize', updateWidth);
@@ -98,7 +95,6 @@ export default function ImageOverlay({
   const playReadAlong = useCallback(async () => {
     isPlayingRef.current = true;
     setIsPlaying(true);
-
     let flatIdx = currentFlatIndex;
 
     while (isPlayingRef.current && flatIdx < allWords.length) {
@@ -107,12 +103,7 @@ export default function ImageOverlay({
       setCurrentWord(wordIdx);
       saveProgress(lineIdx, wordIdx);
 
-      try {
-        await speakHebrew(word.hebrew, speed);
-      } catch {
-        // Speech may fail
-      }
-
+      try { await speakHebrew(word.hebrew, speed); } catch { /* ok */ }
       if (!isPlayingRef.current) break;
 
       const nextWord = allWords[flatIdx + 1];
@@ -125,20 +116,8 @@ export default function ImageOverlay({
     setIsPlaying(false);
   }, [currentFlatIndex, allWords, speed, saveProgress]);
 
-  const handlePause = () => {
-    isPlayingRef.current = false;
-    setIsPlaying(false);
-    stopSpeaking();
-  };
-
-  const handleStop = () => {
-    isPlayingRef.current = false;
-    setIsPlaying(false);
-    stopSpeaking();
-    setCurrentLine(0);
-    setCurrentWord(0);
-    saveProgress(0, 0);
-  };
+  const handlePause = () => { isPlayingRef.current = false; setIsPlaying(false); stopSpeaking(); };
+  const handleStop = () => { isPlayingRef.current = false; setIsPlaying(false); stopSpeaking(); setCurrentLine(0); setCurrentWord(0); saveProgress(0, 0); };
 
   const currentWordData = lines[currentLine]?.words[currentWord];
 
@@ -155,40 +134,48 @@ export default function ImageOverlay({
     <div className="flex flex-col gap-3 pb-32">
       {/* Current word info bar */}
       {currentWordData && (
-        <div className="bg-white rounded-xl p-3 border border-gray-200 shadow-sm flex items-center gap-4 sticky top-0 z-20">
-          <div className="text-2xl font-bold flex-shrink-0" dir="rtl">{currentWordData.hebrew}</div>
-          <div className="flex-1 min-w-0">
-            <div className="text-blue-700 font-semibold text-sm">{currentWordData.transliteration}</div>
-            {currentWordData.translation && (
-              <div className="text-gray-500 text-xs italic">{currentWordData.translation}</div>
-            )}
+        <div className="bg-white rounded-xl p-3 border border-gray-200 shadow-sm sticky top-0 z-20">
+          <div className="flex items-center gap-3">
+            <div className="text-3xl font-bold flex-shrink-0" dir="rtl">{currentWordData.hebrew}</div>
+            <div className="flex-1 min-w-0">
+              <div className="text-blue-700 font-bold text-lg">{currentWordData.transliteration}</div>
+              {showEnglish && currentWordData.translation && (
+                <div className="text-gray-500 text-sm">{currentWordData.translation}</div>
+              )}
+            </div>
+            <button
+              onClick={() => speakHebrew(currentWordData.hebrew, speed)}
+              className="bg-blue-600 hover:bg-blue-700 text-white p-2.5 rounded-full flex-shrink-0 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+              </svg>
+            </button>
           </div>
-          <button
-            onClick={() => speakHebrew(currentWordData.hebrew, speed)}
-            className="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-full flex-shrink-0 transition-colors"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-              <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
-            </svg>
-          </button>
         </div>
       )}
 
-      {/* Image with overlays */}
+      {/* Toggle: English translations */}
+      <button
+        onClick={() => setShowEnglish(!showEnglish)}
+        className={`self-center text-sm font-medium px-4 py-1.5 rounded-full transition-colors ${
+          showEnglish
+            ? 'bg-green-100 text-green-700 border border-green-300'
+            : 'bg-gray-100 text-gray-500 border border-gray-200'
+        }`}
+      >
+        {showEnglish ? 'English: ON' : 'English: OFF'}
+      </button>
+
+      {/* Image with ONLY highlight boxes — no text on image */}
       <div
         ref={containerRef}
         className="relative w-full rounded-xl overflow-hidden border-2 border-gray-200 shadow-md"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={imageDataUrl}
-          alt="Hebrew page"
-          className="w-full block"
-          draggable={false}
-        />
+        <img src={imageDataUrl} alt="Hebrew page" className="w-full block" draggable={false} />
 
-        {/* Word overlays on the image */}
         {scale > 0 && lines.map((line) =>
           line.words.map((word) => {
             const isActive = line.lineIndex === currentLine && word.index === currentWord;
@@ -202,87 +189,77 @@ export default function ImageOverlay({
             const height = (word.bbox.y1 - word.bbox.y0) * scale;
 
             return (
-              <div key={`${line.lineIndex}-${word.index}`}>
-                {/* Clickable highlight over the word */}
-                <button
-                  onClick={() => handleWordClick(line.lineIndex, word.index, word)}
-                  className={`absolute transition-all duration-200 cursor-pointer ${
-                    isActive
-                      ? 'z-10'
-                      : ''
-                  }`}
-                  style={{
-                    left: `${left}px`,
-                    top: `${top}px`,
-                    width: `${width}px`,
-                    height: `${height}px`,
-                    // Active word: yellow highlight + underline
-                    backgroundColor: isActive
-                      ? 'rgba(250, 204, 21, 0.4)'
-                      : isCompleted
-                        ? 'rgba(134, 239, 172, 0.25)'
-                        : 'transparent',
-                    borderBottom: isActive
-                      ? '3px solid #f59e0b'
-                      : isCompleted
-                        ? '2px solid rgba(34, 197, 94, 0.5)'
-                        : '2px solid transparent',
-                    borderRadius: '2px',
-                  }}
-                  title={word.transliteration}
-                />
-
-                {/* Transliteration + translation below each word */}
-                <div
-                  className="absolute pointer-events-none flex flex-col items-center"
-                  style={{
-                    left: `${left}px`,
-                    top: `${top + height + 1}px`,
-                    width: `${Math.max(width, 30)}px`,
-                    textAlign: 'center',
-                    zIndex: isActive ? 10 : 1,
-                  }}
-                >
-                  {/* Transliteration (phonetic) */}
-                  <span
-                    className="inline-block leading-none"
-                    style={{
-                      fontSize: `${Math.max(7, Math.min(13, height * 0.35))}px`,
-                      fontWeight: isActive ? 800 : 600,
-                      color: isActive ? '#b45309' : isCompleted ? '#15803d' : '#1e40af',
-                      backgroundColor: isActive
-                        ? 'rgba(254, 243, 199, 0.95)'
-                        : 'rgba(255, 255, 255, 0.85)',
-                      padding: '0px 2px',
-                      borderRadius: '2px',
-                    }}
-                  >
-                    {word.transliteration}
-                  </span>
-                  {/* English translation */}
-                  {word.translation && (
-                    <span
-                      className="inline-block leading-none mt-px"
-                      style={{
-                        fontSize: `${Math.max(6, Math.min(10, height * 0.28))}px`,
-                        fontWeight: 500,
-                        fontStyle: 'italic',
-                        color: isActive ? '#7c2d12' : '#6b7280',
-                        backgroundColor: isActive
-                          ? 'rgba(254, 243, 199, 0.9)'
-                          : 'rgba(255, 255, 255, 0.8)',
-                        padding: '0px 2px',
-                        borderRadius: '2px',
-                      }}
-                    >
-                      {word.translation}
-                    </span>
-                  )}
-                </div>
-              </div>
+              <button
+                key={`${line.lineIndex}-${word.index}`}
+                onClick={() => handleWordClick(line.lineIndex, word.index, word)}
+                className="absolute transition-all duration-200 cursor-pointer"
+                style={{
+                  left: `${left}px`,
+                  top: `${top}px`,
+                  width: `${width}px`,
+                  height: `${height}px`,
+                  backgroundColor: isActive
+                    ? 'rgba(250, 204, 21, 0.45)'
+                    : isCompleted
+                      ? 'rgba(134, 239, 172, 0.2)'
+                      : 'transparent',
+                  borderBottom: isActive
+                    ? '3px solid #f59e0b'
+                    : isCompleted
+                      ? '2px solid rgba(34, 197, 94, 0.4)'
+                      : 'none',
+                  zIndex: isActive ? 10 : 1,
+                }}
+              />
             );
           })
         )}
+      </div>
+
+      {/* Clean line-by-line reading panel below the image */}
+      <div className="flex flex-col gap-2">
+        {lines.map((line) => {
+          const isActiveLine = line.lineIndex === currentLine;
+          return (
+            <div
+              key={line.lineIndex}
+              className={`rounded-lg p-2 transition-all ${
+                isActiveLine ? 'bg-yellow-50 border border-yellow-200' : 'bg-white border border-gray-100'
+              }`}
+            >
+              {/* Words in this line */}
+              <div className="flex flex-wrap gap-x-3 gap-y-1 justify-end" dir="rtl">
+                {line.words.map((word) => {
+                  const isActive = isActiveLine && word.index === currentWord;
+                  const isCompleted = line.lineIndex < currentLine ||
+                    (isActiveLine && word.index < currentWord);
+
+                  return (
+                    <button
+                      key={word.index}
+                      onClick={() => handleWordClick(line.lineIndex, word.index, word)}
+                      className={`flex flex-col items-center px-1 py-0.5 rounded transition-all ${
+                        isActive
+                          ? 'bg-yellow-200 scale-105'
+                          : isCompleted
+                            ? 'opacity-60'
+                            : 'hover:bg-blue-50'
+                      }`}
+                    >
+                      <span className="text-base font-bold text-gray-900">{word.hebrew}</span>
+                      <span className={`text-xs font-semibold ${isActive ? 'text-amber-700' : 'text-blue-600'}`}>
+                        {word.transliteration}
+                      </span>
+                      {showEnglish && word.translation && (
+                        <span className="text-[10px] text-gray-400 italic">{word.translation}</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Progress bar */}
@@ -290,15 +267,12 @@ export default function ImageOverlay({
         <div className="flex-1 bg-gray-200 rounded-full h-2">
           <div
             className="bg-green-500 h-2 rounded-full transition-all duration-300"
-            style={{
-              width: `${allWords.length > 0 ? ((currentFlatIndex + 1) / allWords.length) * 100 : 0}%`
-            }}
+            style={{ width: `${allWords.length > 0 ? ((currentFlatIndex + 1) / allWords.length) * 100 : 0}%` }}
           />
         </div>
         <span>{currentFlatIndex + 1}/{allWords.length}</span>
       </div>
 
-      {/* Read Along Controls */}
       <ReadAlongControls
         isPlaying={isPlaying}
         speed={speed}
