@@ -16,24 +16,36 @@ interface CropRect {
 }
 
 export default function ImageCropper({ imageDataUrl, onCropComplete, onCancel }: ImageCropperProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [crop, setCrop] = useState<CropRect | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [imgSize, setImgSize] = useState({ w: 0, h: 0 });
 
-  // Get position relative to image
+  const handleImageLoad = () => {
+    setImageLoaded(true);
+    if (imgRef.current) {
+      setImgSize({
+        w: imgRef.current.clientWidth,
+        h: imgRef.current.clientHeight,
+      });
+    }
+  };
+
+  // Get coordinates relative to the image element
   const getPos = useCallback((e: React.TouchEvent | React.MouseEvent) => {
-    const rect = imgRef.current?.getBoundingClientRect();
-    if (!rect) return { x: 0, y: 0 };
+    if (!imgRef.current) return { x: 0, y: 0 };
+    const rect = imgRef.current.getBoundingClientRect();
 
     let clientX: number, clientY: number;
-    if ('touches' in e) {
+    if ('touches' in e && e.touches.length > 0) {
       clientX = e.touches[0].clientX;
       clientY = e.touches[0].clientY;
-    } else {
+    } else if ('clientX' in e) {
       clientX = e.clientX;
       clientY = e.clientY;
+    } else {
+      return { x: 0, y: 0 };
     }
 
     return {
@@ -60,7 +72,7 @@ export default function ImageCropper({ imageDataUrl, onCropComplete, onCancel }:
     setIsDragging(false);
   }, []);
 
-  // Prevent scrolling while dragging on touch
+  // Prevent scrolling on touch devices while dragging
   useEffect(() => {
     const handler = (e: TouchEvent) => {
       if (isDragging) e.preventDefault();
@@ -75,70 +87,76 @@ export default function ImageCropper({ imageDataUrl, onCropComplete, onCancel }:
     const img = imgRef.current;
     const displayW = img.clientWidth;
     const displayH = img.clientHeight;
+
+    // Handle retina/HiDPI: use naturalWidth/Height for the source canvas
     const naturalW = img.naturalWidth;
     const naturalH = img.naturalHeight;
-
     const scaleX = naturalW / displayW;
     const scaleY = naturalH / displayH;
 
-    const x = Math.min(crop.startX, crop.endX) * scaleX;
-    const y = Math.min(crop.startY, crop.endY) * scaleY;
-    const w = Math.abs(crop.endX - crop.startX) * scaleX;
-    const h = Math.abs(crop.endY - crop.startY) * scaleY;
+    // Crop coordinates in natural image pixels
+    const sx = Math.round(Math.min(crop.startX, crop.endX) * scaleX);
+    const sy = Math.round(Math.min(crop.startY, crop.endY) * scaleY);
+    const sw = Math.round(Math.abs(crop.endX - crop.startX) * scaleX);
+    const sh = Math.round(Math.abs(crop.endY - crop.startY) * scaleY);
 
-    if (w < 20 || h < 20) {
+    if (sw < 50 || sh < 50) {
       alert('Please select a larger area');
       return;
     }
 
-    const canvas = document.createElement('canvas');
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d')!;
-    ctx.drawImage(img, x, y, w, h, 0, 0, w, h);
-    onCropComplete(canvas.toDataURL('image/jpeg', 0.9));
+    // Draw cropped image onto a canvas using a loaded Image (not the img element directly,
+    // which can fail on some browsers with CORS)
+    const sourceImg = new Image();
+    sourceImg.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = sw;
+      canvas.height = sh;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(sourceImg, sx, sy, sw, sh, 0, 0, sw, sh);
+      const result = canvas.toDataURL('image/png');
+      onCropComplete(result);
+    };
+    sourceImg.src = imageDataUrl;
   };
 
-  // Compute display rect
-  const getDisplayRect = () => {
-    if (!crop) return null;
-    const left = Math.min(crop.startX, crop.endX);
-    const top = Math.min(crop.startY, crop.endY);
-    const width = Math.abs(crop.endX - crop.startX);
-    const height = Math.abs(crop.endY - crop.startY);
-    return { left, top, width, height };
-  };
+  // Display rect for the selection box
+  const rect = crop ? {
+    left: Math.min(crop.startX, crop.endX),
+    top: Math.min(crop.startY, crop.endY),
+    width: Math.abs(crop.endX - crop.startX),
+    height: Math.abs(crop.endY - crop.startY),
+  } : null;
 
-  const rect = getDisplayRect();
+  const hasSelection = rect && rect.width > 20 && rect.height > 20;
 
   return (
-    <div className="fixed inset-0 bg-black/80 z-50 flex flex-col">
-      {/* Instructions */}
-      <div className="bg-blue-600 text-white text-center py-3 px-4">
-        <p className="font-semibold">Drag to select the Hebrew text area</p>
-        <p className="text-sm text-blue-100">Exclude page numbers, titles, or anything you don&apos;t need</p>
+    <div className="fixed inset-0 bg-black/90 z-50 flex flex-col">
+      {/* Header */}
+      <div className="bg-blue-600 text-white text-center py-3 px-4 flex-shrink-0">
+        <p className="font-semibold text-lg">Select the text area</p>
+        <p className="text-sm text-blue-100">Drag a box around the Hebrew text you want to read</p>
       </div>
 
-      {/* Image area */}
-      <div
-        ref={containerRef}
-        className="flex-1 overflow-auto flex items-start justify-center p-2"
-      >
-        <div className="relative inline-block select-none">
+      {/* Image with selection overlay */}
+      <div className="flex-1 overflow-auto flex items-start justify-center p-2">
+        <div className="relative inline-block select-none" style={{ touchAction: 'none' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             ref={imgRef}
             src={imageDataUrl}
-            alt="Select area to translate"
-            className="max-w-full max-h-[70vh] block"
-            onLoad={() => setImageLoaded(true)}
+            alt="Select area"
+            className="block"
+            style={{ maxWidth: '100%', maxHeight: '65vh' }}
+            onLoad={handleImageLoad}
             draggable={false}
           />
 
-          {/* Touch/mouse overlay */}
+          {/* Touch/mouse overlay for drawing selection */}
           {imageLoaded && (
             <div
-              className="absolute inset-0 cursor-crosshair"
+              className="absolute inset-0"
+              style={{ cursor: 'crosshair' }}
               onMouseDown={handleStart}
               onMouseMove={handleMove}
               onMouseUp={handleEnd}
@@ -147,26 +165,24 @@ export default function ImageCropper({ imageDataUrl, onCropComplete, onCancel }:
               onTouchMove={handleMove}
               onTouchEnd={handleEnd}
             >
-              {/* Darkened overlay outside selection */}
-              {rect && rect.width > 5 && rect.height > 5 && (
+              {/* Dim area outside selection */}
+              {hasSelection && (
                 <>
-                  {/* Top */}
                   <div className="absolute bg-black/50 left-0 right-0 top-0" style={{ height: `${rect.top}px` }} />
-                  {/* Bottom */}
-                  <div className="absolute bg-black/50 left-0 right-0 bottom-0" style={{ top: `${rect.top + rect.height}px` }} />
-                  {/* Left */}
+                  <div className="absolute bg-black/50 left-0 right-0" style={{ top: `${rect.top + rect.height}px`, bottom: 0 }} />
                   <div className="absolute bg-black/50 left-0" style={{ top: `${rect.top}px`, height: `${rect.height}px`, width: `${rect.left}px` }} />
-                  {/* Right */}
-                  <div className="absolute bg-black/50 right-0" style={{ top: `${rect.top}px`, height: `${rect.height}px`, left: `${rect.left + rect.width}px` }} />
-
+                  <div className="absolute bg-black/50" style={{ top: `${rect.top}px`, height: `${rect.height}px`, left: `${rect.left + rect.width}px`, right: 0 }} />
                   {/* Selection border */}
                   <div
-                    className="absolute border-2 border-blue-400 border-dashed"
+                    className="absolute border-3 border-blue-400"
                     style={{
                       left: `${rect.left}px`,
                       top: `${rect.top}px`,
                       width: `${rect.width}px`,
                       height: `${rect.height}px`,
+                      borderWidth: '3px',
+                      borderStyle: 'solid',
+                      borderColor: '#60a5fa',
                     }}
                   />
                 </>
@@ -176,27 +192,30 @@ export default function ImageCropper({ imageDataUrl, onCropComplete, onCancel }:
         </div>
       </div>
 
-      {/* Buttons */}
-      <div className="flex gap-3 p-4 bg-gray-900">
-        <button
-          onClick={onCancel}
-          className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-semibold py-3 rounded-xl transition-colors"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={() => {
-            // Use full image if no selection
-            if (!rect || rect.width < 20 || rect.height < 20) {
-              onCropComplete(imageDataUrl);
-            } else {
-              handleCrop();
-            }
-          }}
-          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-colors"
-        >
-          {rect && rect.width > 20 ? 'Use Selection' : 'Use Full Image'}
-        </button>
+      {/* Bottom buttons */}
+      <div className="flex-shrink-0 p-4 bg-gray-900 space-y-3">
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-3 rounded-xl transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={hasSelection ? handleCrop : () => onCropComplete(imageDataUrl)}
+            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-colors"
+          >
+            {hasSelection ? 'Use Selection' : 'Use Full Image'}
+          </button>
+        </div>
+        {hasSelection && (
+          <button
+            onClick={() => setCrop(null)}
+            className="w-full text-sm text-gray-400 hover:text-white transition-colors"
+          >
+            Clear selection
+          </button>
+        )}
       </div>
     </div>
   );

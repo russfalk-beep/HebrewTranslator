@@ -8,6 +8,7 @@ export interface BBox {
 export interface HebrewWord {
   hebrew: string;
   transliteration: string;
+  translation: string | null;
   index: number;
   bbox: BBox;
   confidence: number;

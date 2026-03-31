@@ -1,6 +1,7 @@
 import { createWorker } from 'tesseract.js';
 import { HebrewLine, HebrewWord } from './types';
 import { transliterateHebrew, isHebrew } from './transliterate';
+import { translateWord } from './dictionary';
 
 export interface OcrResult {
   lines: HebrewLine[];
@@ -45,6 +46,7 @@ export async function processImage(
               words.push({
                 hebrew: text,
                 transliteration: isHebrew(text) ? transliterateHebrew(text) : text,
+                translation: isHebrew(text) ? translateWord(text) : null,
                 index: wordIndex,
                 bbox: {
                   x0: word.bbox.x0,
