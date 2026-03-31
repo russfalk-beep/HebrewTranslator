@@ -9,6 +9,29 @@ export interface OcrResult {
   imageHeight: number;
 }
 
+// Filter out OCR noise: verse numbers, single punctuation, non-Hebrew junk
+function shouldSkipWord(text: string, confidence: number): boolean {
+  // Skip if confidence is very low
+  if (confidence < 20) return true;
+
+  // Skip pure numbers (verse numbers like 1, 2, 3)
+  if (/^\d+$/.test(text)) return true;
+
+  // Skip single characters that aren't Hebrew letters
+  if (text.length === 1 && !isHebrew(text)) return true;
+
+  // Skip punctuation-only strings
+  if (/^[^\u05D0-\u05EA\w]+$/.test(text)) return true;
+
+  // Skip very short non-Hebrew strings (like ":", ".", ",")
+  if (text.length <= 2 && !isHebrew(text)) return true;
+
+  // Skip common OCR artifacts
+  if (/^[|\\\/\[\]{}()]+$/.test(text)) return true;
+
+  return false;
+}
+
 export async function processImage(
   imageSource: File | string,
   onProgress?: (progress: number) => void
@@ -50,6 +73,9 @@ export async function processImage(
               // Clean up Hebrew punctuation (geresh, gershayim, quotes)
               const text = cleanHebrewText(rawText);
               if (!text) continue;
+
+              // Skip junk: verse numbers, single chars, punctuation-only, low confidence
+              if (shouldSkipWord(text, word.confidence)) continue;
 
               // Split maqaf-joined words (like תמימי-דרך → two words)
               const subWords = text.includes(' ') ? text.split(' ') : [text];
@@ -103,7 +129,9 @@ export async function processImage(
       const lineHeight = dims.height / Math.max(textLines.length, 1);
 
       textLines.forEach((lineText: string, li: number) => {
-        const wordTexts = lineText.trim().split(/\s+/).filter((w: string) => w.length > 0);
+        const wordTexts = lineText.trim().split(/\s+/)
+          .map((w: string) => cleanHebrewText(w))
+          .filter((w: string) => w.length > 0 && !shouldSkipWord(w, 50));
         const wordWidth = dims.width / Math.max(wordTexts.length, 1);
         const words: HebrewWord[] = wordTexts.map((text: string, wi: number) => ({
           hebrew: text,
