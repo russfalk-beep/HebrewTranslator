@@ -9,13 +9,31 @@ export interface OcrResult {
   imageHeight: number;
 }
 
-// Filter out lines that are likely from illustrations/decorations, not body text.
-// Body text has consistent character heights and multiple words per line.
-// Illustration text is scattered, small, or single-word.
-function filterNoiseLines(lines: HebrewLine[]): void {
+// Smart filter: keep only the actual body text, remove illustration/edge/decoration noise
+function filterNoiseLines(lines: HebrewLine[], imgWidth: number, imgHeight: number): void {
   if (lines.length < 2) return;
 
-  // Calculate the median word height across all lines
+  // Step 1: Remove words near image edges (likely bleed-through from other pages)
+  const edgeMarginX = imgWidth * 0.04;  // 4% from left/right edges
+  const edgeMarginY = imgHeight * 0.03; // 3% from top/bottom edges
+
+  for (const line of lines) {
+    line.words = line.words.filter(w => {
+      const midX = (w.bbox.x0 + w.bbox.x1) / 2;
+      const midY = (w.bbox.y0 + w.bbox.y1) / 2;
+      return midX > edgeMarginX && midX < imgWidth - edgeMarginX &&
+             midY > edgeMarginY && midY < imgHeight - edgeMarginY;
+    });
+  }
+
+  // Remove empty lines
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (lines[i].words.length === 0) lines.splice(i, 1);
+  }
+
+  if (lines.length < 2) return;
+
+  // Step 2: Calculate median word height (= the body text size)
   const allHeights: number[] = [];
   for (const line of lines) {
     for (const word of line.words) {
@@ -28,28 +46,37 @@ function filterNoiseLines(lines: HebrewLine[]): void {
   allHeights.sort((a, b) => a - b);
   const medianHeight = allHeights[Math.floor(allHeights.length / 2)];
 
-  // Also look at line word counts
-  const wordCounts = lines.map(l => l.words.length);
-  wordCounts.sort((a, b) => a - b);
-  const medianWords = wordCounts[Math.floor(wordCounts.length / 2)];
+  // Step 3: Find the most common X range (body text is usually aligned)
+  // Body text lines tend to share similar right-edge X positions (RTL text)
+  const lineRightEdges = lines.map(l => {
+    const maxX = Math.max(...l.words.map(w => w.bbox.x1));
+    return maxX;
+  });
+  lineRightEdges.sort((a, b) => a - b);
+  const medianRightEdge = lineRightEdges[Math.floor(lineRightEdges.length / 2)];
 
-  // Remove lines where:
-  // 1. Average word height is much smaller than median (illustration text)
-  // 2. Line has only 1 word and it's a single Hebrew letter
-  // 3. Line height is very different from the typical body text
-  let i = lines.length - 1;
-  while (i >= 0) {
+  // Step 4: Remove lines that don't match body text characteristics
+  for (let i = lines.length - 1; i >= 0; i--) {
     const line = lines[i];
     const avgHeight = line.words.reduce((sum, w) => sum + (w.bbox.y1 - w.bbox.y0), 0) / line.words.length;
+    const lineRight = Math.max(...line.words.map(w => w.bbox.x1));
 
+    // Text much smaller than body text = illustration label
     const isTooSmall = avgHeight < medianHeight * 0.5;
-    const isSingleJunk = line.words.length === 1 && line.words[0].hebrew.length <= 2;
-    const isTooFewWords = medianWords >= 3 && line.words.length === 1 && line.words[0].hebrew.length <= 3;
 
-    if (isTooSmall || isSingleJunk || isTooFewWords) {
+    // Text much larger than body text = header/title
+    const isTooLarge = avgHeight > medianHeight * 2.0;
+
+    // Single short word = likely noise
+    const isSingleJunk = line.words.length === 1 && line.words[0].hebrew.length <= 3;
+
+    // Line is far from the typical text alignment = illustration text
+    const rightEdgeDiff = Math.abs(lineRight - medianRightEdge);
+    const isMisaligned = rightEdgeDiff > imgWidth * 0.35 && line.words.length <= 2;
+
+    if (isTooSmall || isTooLarge || isSingleJunk || isMisaligned) {
       lines.splice(i, 1);
     }
-    i--;
   }
 
   // Re-index lines
@@ -179,11 +206,11 @@ export async function processImage(
     }
 
     // Post-process: filter out illustration/decoration text by size consistency
-    filterNoiseLines(lines);
+    const dims = await getImageDimensions(imageSource);
+    filterNoiseLines(lines, dims.width, dims.height);
 
     // Fallback: if blocks didn't work but we have plain text, parse it manually
     if (lines.length === 0 && data.text && data.text.trim().length > 0) {
-      const dims = await getImageDimensions(imageSource);
       const textLines = data.text.split('\n').filter((l: string) => l.trim().length > 0);
       const lineHeight = dims.height / Math.max(textLines.length, 1);
 
@@ -222,7 +249,6 @@ export async function processImage(
       });
     }
 
-    const dims = await getImageDimensions(imageSource);
     return { lines, imageWidth: dims.width, imageHeight: dims.height };
   } finally {
     try { await worker.terminate(); } catch { /* ok */ }
