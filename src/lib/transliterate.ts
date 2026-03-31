@@ -248,25 +248,25 @@ export function transliterateHebrew(text: string): string {
     let result = syllabify(tokens);
     return cleanResult(result);
   } else {
-    // Unpointed text: just output consonants with inserted 'a' vowels
-    let raw = tokens.map(t => t.text).join('');
-    raw = raw.trim().replace(/-+/g, '-').replace(/^-|-$/g, '');
+    // Unpointed text: work with tokens (which preserve digraphs like "sh", "ch", "tz")
+    const consonants = tokens.filter(t => t.type === 'C').map(t => t.text);
 
-    if (raw.length > 1 && !/[aeiou]/i.test(raw)) {
-      let readable = '';
-      for (let i = 0; i < raw.length; i++) {
-        readable += raw[i];
-        if (i < raw.length - 1 &&
-            !/[aeiou \-]/i.test(raw[i]) &&
-            !/[aeiou \-]/i.test(raw[i + 1])) {
-          readable += 'a';
-        }
+    if (consonants.length === 0) return '';
+    if (consonants.length === 1) return consonants[0] + 'a';
+
+    // Insert 'a' between consonant groups to make it pronounceable
+    // Each consonant token is already a proper unit (sh, ch, tz are single tokens)
+    let syllables: string[] = [];
+    for (let i = 0; i < consonants.length; i++) {
+      if (i < consonants.length - 1) {
+        syllables.push(consonants[i] + 'a');
+      } else {
+        // Last consonant — no trailing vowel
+        syllables.push(consonants[i]);
       }
-      raw = readable;
     }
 
-    // Add syllable dashes for unpointed text too
-    return addDashesToUnpointed(raw);
+    return syllables.join('-');
   }
 }
 

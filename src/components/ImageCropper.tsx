@@ -134,8 +134,8 @@ export default function ImageCropper({ imageDataUrl, onCropComplete, onCancel }:
     <div className="fixed inset-0 bg-black/90 z-50 flex flex-col">
       {/* Header */}
       <div className="bg-blue-600 text-white text-center py-3 px-4 flex-shrink-0">
-        <p className="font-semibold text-lg">Select the text area</p>
-        <p className="text-sm text-blue-100">Drag a box around the Hebrew text you want to read</p>
+        <p className="font-semibold text-lg">Drag to select JUST the text</p>
+        <p className="text-sm text-blue-100">Draw a box around the Hebrew words only — skip pictures, page numbers, and edges. This helps the reading tracker line up correctly!</p>
       </div>
 
       {/* Image with selection overlay */}
