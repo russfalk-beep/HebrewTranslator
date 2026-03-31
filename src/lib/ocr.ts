@@ -36,18 +36,24 @@ export async function processImage(
   imageSource: File | string,
   onProgress?: (progress: number) => void
 ): Promise<OcrResult> {
-  const worker = await createWorker('heb', undefined, {
-    logger: (m) => {
-      if (m.status === 'recognizing text' && onProgress) {
-        onProgress(Math.round(m.progress * 100));
-      }
-    },
-  });
+  // Load dictionary in background — don't let it block or crash OCR
+  loadDictionary().catch(() => {});
+
+  let worker;
+  try {
+    worker = await createWorker('heb', undefined, {
+      logger: (m) => {
+        if (m.status === 'recognizing text' && onProgress) {
+          onProgress(Math.round(m.progress * 100));
+        }
+      },
+    });
+  } catch (err) {
+    console.error('Failed to create Tesseract worker:', err);
+    throw new Error('Could not start text recognition. Please refresh and try again.');
+  }
 
   try {
-    // Load full dictionary while OCR runs
-    await loadDictionary();
-
     // Enable blocks output to get word-level bounding boxes
     const { data } = await worker.recognize(imageSource, {}, { blocks: true, text: true });
 
@@ -166,7 +172,7 @@ export async function processImage(
     const dims = await getImageDimensions(imageSource);
     return { lines, imageWidth: dims.width, imageHeight: dims.height };
   } finally {
-    await worker.terminate();
+    try { await worker.terminate(); } catch { /* ok */ }
   }
 }
 

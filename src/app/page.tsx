@@ -77,7 +77,8 @@ export default function Home() {
       setPages(getSavedPages());
     } catch (error) {
       console.error('OCR failed:', error);
-      alert('Failed to process the image. Please try again.');
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to process the image: ${msg}\n\nTip: Try using "Use Full Image" instead of cropping, or try a different photo.`);
       setIsProcessing(false);
     }
   };
