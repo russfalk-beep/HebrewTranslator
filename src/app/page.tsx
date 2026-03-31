@@ -46,7 +46,7 @@ export default function Home() {
 
       savePage(newPage);
       setIsProcessing(false);
-      router.push(`/page/${newPage.id}`);
+      router.push(`/HebrewTranslator/reader?id=${newPage.id}`);
     } catch (error) {
       console.error('OCR failed:', error);
       alert('Failed to process the image. Please try again.');
@@ -119,7 +119,7 @@ export default function Home() {
                   className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow"
                 >
                   <button
-                    onClick={() => router.push(`/page/${page.id}`)}
+                    onClick={() => router.push(`/HebrewTranslator/reader?id=${page.id}`)}
                     className="w-full p-4 text-left"
                   >
                     <div className="flex items-center gap-3">

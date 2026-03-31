@@ -1,21 +1,26 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { SavedPage } from '@/lib/types';
 import { getPage, updateProgress } from '@/lib/storage';
 import PageViewer from '@/components/PageViewer';
 
-export default function PageView({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+function ReaderContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const id = searchParams.get('id');
   const [page, setPage] = useState<SavedPage | null>(null);
   const [showImage, setShowImage] = useState(false);
 
   useEffect(() => {
+    if (!id) {
+      router.push('/HebrewTranslator');
+      return;
+    }
     const savedPage = getPage(id);
     if (!savedPage) {
-      router.push('/');
+      router.push('/HebrewTranslator');
       return;
     }
     setPage(savedPage);
@@ -40,7 +45,7 @@ export default function PageView({ params }: { params: Promise<{ id: string }> }
       {/* Header */}
       <div className="flex items-center gap-3 mb-4">
         <button
-          onClick={() => router.push('/')}
+          onClick={() => router.push('/HebrewTranslator')}
           className="p-2 rounded-lg hover:bg-gray-200 transition-colors"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -77,5 +82,17 @@ export default function PageView({ params }: { params: Promise<{ id: string }> }
         onProgressChange={handleProgressChange}
       />
     </main>
+  );
+}
+
+export default function ReaderPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex-1 flex items-center justify-center">
+        <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"/>
+      </div>
+    }>
+      <ReaderContent />
+    </Suspense>
   );
 }
