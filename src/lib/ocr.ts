@@ -22,13 +22,14 @@ export async function processImage(
   });
 
   try {
-    const { data } = await worker.recognize(imageSource);
+    // Enable blocks output to get word-level bounding boxes
+    const { data } = await worker.recognize(imageSource, {}, { blocks: true, text: true });
 
     const lines: HebrewLine[] = [];
     let lineIndex = 0;
 
     // Tesseract v7: data.blocks -> paragraphs -> lines -> words
-    if (data.blocks) {
+    if (data.blocks && data.blocks.length > 0) {
       for (const block of data.blocks) {
         if (!block.paragraphs) continue;
         for (const paragraph of block.paragraphs) {
@@ -76,6 +77,45 @@ export async function processImage(
           }
         }
       }
+    }
+
+    // Fallback: if blocks didn't work but we have plain text, parse it manually
+    if (lines.length === 0 && data.text && data.text.trim().length > 0) {
+      const dims = await getImageDimensions(imageSource);
+      const textLines = data.text.split('\n').filter((l: string) => l.trim().length > 0);
+      const lineHeight = dims.height / Math.max(textLines.length, 1);
+
+      textLines.forEach((lineText: string, li: number) => {
+        const wordTexts = lineText.trim().split(/\s+/).filter((w: string) => w.length > 0);
+        const wordWidth = dims.width / Math.max(wordTexts.length, 1);
+        const words: HebrewWord[] = wordTexts.map((text: string, wi: number) => ({
+          hebrew: text,
+          transliteration: isHebrew(text) ? transliterateHebrew(text) : text,
+          translation: isHebrew(text) ? translateWord(text) : null,
+          index: wi,
+          bbox: {
+            x0: dims.width - (wi + 1) * wordWidth, // RTL approximation
+            y0: li * lineHeight,
+            x1: dims.width - wi * wordWidth,
+            y1: (li + 1) * lineHeight,
+          },
+          confidence: 50,
+        }));
+
+        if (words.length > 0) {
+          lines.push({
+            words,
+            fullText: lineText.trim(),
+            lineIndex: li,
+            bbox: {
+              x0: 0,
+              y0: li * lineHeight,
+              x1: dims.width,
+              y1: (li + 1) * lineHeight,
+            },
+          });
+        }
+      });
     }
 
     const dims = await getImageDimensions(imageSource);
