@@ -1,6 +1,6 @@
 import { createWorker } from 'tesseract.js';
 import { HebrewLine, HebrewWord } from './types';
-import { transliterateHebrew, isHebrew } from './transliterate';
+import { transliterateHebrew, isHebrew, cleanHebrewText } from './transliterate';
 import { translateWord, loadDictionary } from './dictionary';
 
 export interface OcrResult {
@@ -44,23 +44,37 @@ export async function processImage(
             let wordIndex = 0;
 
             for (const word of line.words) {
-              const text = word.text.trim();
+              const rawText = word.text.trim();
+              if (!rawText) continue;
+
+              // Clean up Hebrew punctuation (geresh, gershayim, quotes)
+              const text = cleanHebrewText(rawText);
               if (!text) continue;
 
-              words.push({
-                hebrew: text,
-                transliteration: isHebrew(text) ? transliterateHebrew(text) : text,
-                translation: isHebrew(text) ? translateWord(text) : null,
-                index: wordIndex,
-                bbox: {
-                  x0: word.bbox.x0,
-                  y0: word.bbox.y0,
-                  x1: word.bbox.x1,
-                  y1: word.bbox.y1,
-                },
-                confidence: word.confidence,
-              });
-              wordIndex++;
+              // Split maqaf-joined words (like תמימי-דרך → two words)
+              const subWords = text.includes(' ') ? text.split(' ') : [text];
+              const subWidth = (word.bbox.x1 - word.bbox.x0) / subWords.length;
+
+              for (let sw = 0; sw < subWords.length; sw++) {
+                const subText = subWords[sw].trim();
+                if (!subText) continue;
+
+                words.push({
+                  hebrew: subText,
+                  transliteration: isHebrew(subText) ? transliterateHebrew(subText) : subText,
+                  translation: isHebrew(subText) ? translateWord(subText) : null,
+                  index: wordIndex,
+                  bbox: {
+                    // Approximate sub-word bounding box (RTL: rightmost first)
+                    x0: word.bbox.x0 + (subWords.length - 1 - sw) * subWidth,
+                    y0: word.bbox.y0,
+                    x1: word.bbox.x0 + (subWords.length - sw) * subWidth,
+                    y1: word.bbox.y1,
+                  },
+                  confidence: word.confidence,
+                });
+                wordIndex++;
+              }
             }
 
             if (words.length > 0) {

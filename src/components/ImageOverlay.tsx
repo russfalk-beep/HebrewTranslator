@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { HebrewLine, HebrewWord } from '@/lib/types';
-import { speakHebrew, stopSpeaking, initVoices } from '@/lib/speech';
+import { speakHebrew, stopSpeaking, initVoices, getAvailableHebrewVoices, setVoice } from '@/lib/speech';
 import ReadAlongControls from './ReadAlongControls';
 
 interface ImageOverlayProps {
@@ -31,9 +31,17 @@ export default function ImageOverlay({
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeed] = useState(0.8);
   const [showEnglish, setShowEnglish] = useState(false);
+  const [showVoicePicker, setShowVoicePicker] = useState(false);
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [selectedVoiceName, setSelectedVoiceName] = useState('');
   const isPlayingRef = useRef(false);
 
-  useEffect(() => { initVoices(); }, []);
+  useEffect(() => {
+    initVoices().then(() => {
+      const available = getAvailableHebrewVoices();
+      setVoices(available);
+    });
+  }, []);
 
   useEffect(() => {
     const updateWidth = () => {
@@ -156,17 +164,55 @@ export default function ImageOverlay({
         </div>
       )}
 
-      {/* Toggle: English translations */}
-      <button
-        onClick={() => setShowEnglish(!showEnglish)}
-        className={`self-center text-sm font-medium px-4 py-1.5 rounded-full transition-colors ${
-          showEnglish
-            ? 'bg-green-100 text-green-700 border border-green-300'
-            : 'bg-gray-100 text-gray-500 border border-gray-200'
-        }`}
-      >
-        {showEnglish ? 'English: ON' : 'English: OFF'}
-      </button>
+      {/* Controls row */}
+      <div className="flex items-center justify-center gap-2 flex-wrap">
+        {/* English toggle */}
+        <button
+          onClick={() => setShowEnglish(!showEnglish)}
+          className={`text-sm font-medium px-3 py-1.5 rounded-full transition-colors ${
+            showEnglish
+              ? 'bg-green-100 text-green-700 border border-green-300'
+              : 'bg-gray-100 text-gray-500 border border-gray-200'
+          }`}
+        >
+          {showEnglish ? 'English: ON' : 'English: OFF'}
+        </button>
+
+        {/* Voice picker */}
+        {voices.length > 0 && (
+          <button
+            onClick={() => setShowVoicePicker(!showVoicePicker)}
+            className="text-sm font-medium px-3 py-1.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200 transition-colors hover:bg-blue-50"
+          >
+            Voice {selectedVoiceName ? `(${selectedVoiceName})` : ''}
+          </button>
+        )}
+      </div>
+
+      {/* Voice picker dropdown */}
+      {showVoicePicker && voices.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-md p-3">
+          <p className="text-xs text-gray-400 mb-2">Choose a Hebrew voice:</p>
+          <div className="flex flex-col gap-1">
+            {voices.map((voice, idx) => (
+              <button
+                key={idx}
+                onClick={() => {
+                  setVoice(voice);
+                  setSelectedVoiceName(voice.name.split(' ').slice(0, 2).join(' '));
+                  setShowVoicePicker(false);
+                  speakHebrew('שלום', speed);
+                }}
+                className="text-left text-sm px-3 py-2 rounded-lg hover:bg-blue-50 transition-colors"
+              >
+                <span className="font-medium">{voice.name}</span>
+                <span className="text-gray-400 text-xs ml-2">({voice.lang})</span>
+                {!voice.localService && <span className="text-blue-500 text-xs ml-1">cloud</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Image with ONLY highlight boxes — no text on image */}
       <div

@@ -1,166 +1,152 @@
-// Simple, readable Hebrew-to-English phonetic transliteration
-// Designed for parents helping kids learn — NOT academic notation
+// NCSY / ArtScroll Prayer Book style transliteration
+// The standard used in American Hebrew schools and synagogues
+// Designed to be read naturally by English speakers
 
 const CONSONANTS: Record<string, string> = {
-  'א': '',      // silent
-  'ב': 'v',
-  'ג': 'g',
-  'ד': 'd',
-  'ה': 'h',
-  'ו': 'v',
-  'ז': 'z',
-  'ח': 'kh',
-  'ט': 't',
-  'י': 'y',
-  'כ': 'kh',
-  'ך': 'kh',
-  'ל': 'l',
-  'מ': 'm',
-  'ם': 'm',
-  'נ': 'n',
-  'ן': 'n',
-  'ס': 's',
-  'ע': '',      // silent
-  'פ': 'f',
-  'ף': 'f',
-  'צ': 'tz',
-  'ץ': 'tz',
-  'ק': 'k',
-  'ר': 'r',
-  'ש': 'sh',
-  'ת': 't',
+  'א': '',       // Alef — silent, just carries the vowel
+  'ב': 'v',      // Vet (no dagesh)
+  'ג': 'g',      // Gimel
+  'ד': 'd',      // Dalet
+  'ה': 'h',      // Hey
+  'ו': 'v',      // Vav (as consonant)
+  'ז': 'z',      // Zayin
+  'ח': 'ch',     // Chet — as in "Bach" (NCSY standard)
+  'ט': 't',      // Tet
+  'י': 'y',      // Yud
+  'כ': 'ch',     // Chaf (no dagesh) — same sound as Chet
+  'ך': 'ch',     // Final Chaf
+  'ל': 'l',      // Lamed
+  'מ': 'm',      // Mem
+  'ם': 'm',      // Final Mem
+  'נ': 'n',      // Nun
+  'ן': 'n',      // Final Nun
+  'ס': 's',      // Samech
+  'ע': '',       // Ayin — silent in modern Hebrew
+  'פ': 'f',      // Fey (no dagesh)
+  'ף': 'f',      // Final Fey
+  'צ': 'tz',     // Tzadi
+  'ץ': 'tz',     // Final Tzadi
+  'ק': 'k',      // Kuf
+  'ר': 'r',      // Resh
+  'ש': 'sh',     // Shin (default)
+  'ת': 't',      // Tav
 };
 
-// With dagesh (dot inside) - changes pronunciation
+// With dagesh (dot inside letter) — changes some letters
 const WITH_DAGESH: Record<string, string> = {
-  'ב': 'b',
-  'כ': 'k',
-  'פ': 'p',
-  'ת': 't',
-  'ג': 'g',
-  'ד': 'd',
+  'ב': 'b',      // Bet
+  'כ': 'k',      // Kaf
+  'פ': 'p',      // Pey
 };
 
+// Niqqud vowel marks → simple English vowels
 const VOWELS: Record<string, string> = {
-  '\u05B0': 'e',   // Shva (short e or silent)
-  '\u05B1': 'e',   // Hataf Segol
-  '\u05B2': 'a',   // Hataf Patah
-  '\u05B3': 'o',   // Hataf Qamats
-  '\u05B4': 'i',   // Hiriq
-  '\u05B5': 'ei',  // Tsere
-  '\u05B6': 'e',   // Segol
-  '\u05B7': 'a',   // Patah
-  '\u05B8': 'a',   // Qamats
-  '\u05B9': 'o',   // Holam
-  '\u05BA': 'o',   // Holam Haser
-  '\u05BB': 'u',   // Qubuts
-  '\u05BC': '',    // Dagesh
+  '\u05B0': 'e',   // Shva — short "e" or silent
+  '\u05B1': 'e',   // Chataf Segol
+  '\u05B2': 'a',   // Chataf Patach
+  '\u05B3': 'o',   // Chataf Kamatz
+  '\u05B4': 'i',   // Chirik — "ee"
+  '\u05B5': 'ei',  // Tzeirei — "ay" as in "they"
+  '\u05B6': 'e',   // Segol — "e" as in "bed"
+  '\u05B7': 'a',   // Patach — "a" as in "father"
+  '\u05B8': 'a',   // Kamatz — "a" as in "father"
+  '\u05B9': 'o',   // Cholam — "o" as in "go"
+  '\u05BA': 'o',   // Cholam Chaser
+  '\u05BB': 'u',   // Kubutz — "oo" as in "blue"
+  '\u05BC': '',    // Dagesh — handled separately
 };
 
 export function transliterateHebrew(text: string): string {
   const chars = [...text];
   let result = '';
-  let lastWasVowel = false;
 
   for (let i = 0; i < chars.length; i++) {
     const char = chars[i];
     const code = char.codePointAt(0) || 0;
 
-    // Hebrew consonant
+    // Hebrew consonant (Alef through Tav)
     if (code >= 0x05D0 && code <= 0x05EA) {
-      // Check for dagesh in next char
       const nextIsDagesh = i + 1 < chars.length && chars[i + 1] === '\u05BC';
 
-      // Shin/Sin dots
+      // Shin/Sin distinction
       if (char === 'ש') {
         if (i + 1 < chars.length && chars[i + 1] === '\u05C2') {
-          result += 's';  // Sin
+          result += 's';  // Sin (dot on left)
           i++;
-          lastWasVowel = false;
           continue;
         }
-        // Shin dot or default
-        if (i + 1 < chars.length && chars[i + 1] === '\u05C1') i++;
+        if (i + 1 < chars.length && chars[i + 1] === '\u05C1') i++; // skip shin dot
         result += 'sh';
-        lastWasVowel = false;
         continue;
       }
 
-      // Vav with vowel marks = vowel, not consonant
+      // Vav as vowel (Shuruk or Cholam Male)
       if (char === 'ו') {
         if (nextIsDagesh) {
-          result += 'u';  // Shuruk
+          result += 'u';  // Shuruk = "oo"
           i++;
-          lastWasVowel = true;
           continue;
         }
         if (i + 1 < chars.length && chars[i + 1] === '\u05B9') {
-          result += 'o';  // Holam male
+          result += 'o';  // Cholam Male
           i++;
-          lastWasVowel = true;
           continue;
         }
       }
 
+      // Dagesh changes bet/kaf/pey
       if (nextIsDagesh && WITH_DAGESH[char]) {
         result += WITH_DAGESH[char];
-        i++; // skip dagesh
+        i++;
       } else {
         result += CONSONANTS[char] || '';
       }
-      lastWasVowel = false;
     }
     // Vowel mark (niqqud)
     else if (code >= 0x05B0 && code <= 0x05BC) {
-      const vowel = VOWELS[char] || '';
-      if (vowel) {
-        // Avoid double vowels
-        if (!lastWasVowel || vowel !== result[result.length - 1]) {
-          result += vowel;
-        }
-        lastWasVowel = true;
-      }
+      result += VOWELS[char] || '';
     }
-    // Skip other combining marks
+    // Skip other combining marks (shin/sin dots, etc.)
     else if (code >= 0x05BD && code <= 0x05C7) {
       continue;
     }
-    // Dash/maqaf between words
-    else if (char === '\u05BE' || char === '-') {
+    // Hebrew maqaf (word-joining dash)
+    else if (char === '\u05BE') {
       result += '-';
-      lastWasVowel = false;
     }
     // Space
     else if (char === ' ') {
       result += ' ';
-      lastWasVowel = false;
     }
-    // Pass through Latin chars, numbers, punctuation
+    // Skip geresh/gershayim (Hebrew punctuation that looks like quotes)
+    else if (char === '\u05F3' || char === '\u05F4' || char === '"' || char === "'") {
+      continue;
+    }
+    // Pass through Latin chars and numbers
     else if (code < 0x0590 || code > 0x05FF) {
       result += char;
-      lastWasVowel = false;
     }
   }
 
-  // Clean up: remove leading/trailing dashes, collapse double consonants
   let clean = result.trim()
-    .replace(/^-+|-+$/g, '')
-    .replace(/([^aeiou])\1+/g, '$1')  // remove doubled consonants like "ll" -> "l"
-    .replace(/'/g, '');                 // remove stray apostrophes
+    .replace(/-+/g, '-')      // collapse multiple dashes
+    .replace(/^-|-$/g, '');   // remove leading/trailing dashes
 
-  // If no vowels were found (unpointed text), insert default 'a' between consonants
-  if (clean.length > 0 && !/[aeiou]/i.test(clean)) {
-    let withVowels = '';
+  // For unpointed text (no niqqud), insert 'a' between consonant clusters
+  // to make it pronounceable
+  if (clean.length > 1 && !/[aeiou]/i.test(clean)) {
+    let readable = '';
     for (let i = 0; i < clean.length; i++) {
-      withVowels += clean[i];
-      // Add 'a' between consonants (not at end, not before space/dash)
+      readable += clean[i];
       if (i < clean.length - 1 &&
-          !/[aeiou \-]/.test(clean[i]) &&
-          !/[aeiou \-]/.test(clean[i + 1])) {
-        withVowels += 'a';
+          clean[i] !== ' ' && clean[i] !== '-' &&
+          clean[i + 1] !== ' ' && clean[i + 1] !== '-' &&
+          !/[aeiou]/i.test(clean[i]) &&
+          !/[aeiou]/i.test(clean[i + 1])) {
+        readable += 'a';
       }
     }
-    clean = withVowels;
+    clean = readable;
   }
 
   return clean;
@@ -168,4 +154,13 @@ export function transliterateHebrew(text: string): string {
 
 export function isHebrew(text: string): boolean {
   return /[\u05D0-\u05EA]/.test(text);
+}
+
+// Strip Hebrew punctuation marks that cause display issues
+export function cleanHebrewText(text: string): string {
+  return text
+    .replace(/[״׳"']/g, '')           // Remove geresh, gershayim, quotes
+    .replace(/\u05BE/g, ' ')           // Replace maqaf with space
+    .replace(/\s+/g, ' ')             // Collapse whitespace
+    .trim();
 }
